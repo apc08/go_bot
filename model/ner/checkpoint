@@ -1,0 +1,2 @@
+model_checkpoint_path: "/Users/zhangxiaoshan/workspace/python/qa/dm/dm/my_dm/rl_dm/deepPavlov_bot/go_bot/model/ner/ner_model.ckpt"
+all_model_checkpoint_paths: "/Users/zhangxiaoshan/workspace/python/qa/dm/dm/my_dm/rl_dm/deepPavlov_bot/go_bot/model/ner/ner_model.ckpt"
