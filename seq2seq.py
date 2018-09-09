@@ -334,7 +334,7 @@ def bilinear_attention(passage_resp, question_resp, passage_mask):
     # [batch_size, hidden_size]
     question_resp = tf.matmul(question_resp, W_bilinear)
 
-    # [batch_size, 1, hidden_size]
+    # [batch_size, 0, hidden_size]
     question_resp = tf.expand_dims(question_resp, 1)
 
     # [batch_size, seq_length]
@@ -378,15 +378,13 @@ def attention_rollout_decoder(encoder_outputs, encoder_state, pred_tokens,
             name='decoder_cell')
 
         # start_token
-        output_token = tf.ones((tf.shape(encoder_outputs)[0],),dtype=tf.float32)
+        output_token = tf.ones((tf.shape(encoder_outputs)[0],),dtype=tf.int32) * start_token_id
+        #output_token = tf.ones(shape=(tf.shape(encoder_outputs)[0],), dtype=tf.int32) * start_token_id
         decoder_state = encoder_state
 
         sample_rollout_step = []
 
         for step in range(max_length):
-            #print("--------- %d ---------------" % step)
-            #print(pred_tokens[:,0:step])
-            #batch_size = pred_tokens.get_shape().as_list()[0]
 
             if step > 0:
                 sample_rollout_left = tf.reshape(pred_tokens[:,0:step], shape=[-1,step])
@@ -395,7 +393,7 @@ def attention_rollout_decoder(encoder_outputs, encoder_state, pred_tokens,
 
             for i in range(step):
                 if i > 0:
-                    output_token = pred_tokens[:,i]
+                    output_token = pred_tokens[:,i-1]
                     input_token_emb = tf.nn.embedding_lookup(embeddings_matrix, output_token)
                 else:
                     input_token_emb = tf.nn.embedding_lookup(embeddings_matrix, output_token)
@@ -410,9 +408,13 @@ def attention_rollout_decoder(encoder_outputs, encoder_state, pred_tokens,
                 decoder_output, decoder_state = decoder_cell(input_token_emb, decoder_state)
 
             for j in range(step, max_length):
-                if  j == step:
-                    input_token_emb =  tf.nn.embedding_lookup(embeddings_matrix, pred_tokens[:,step])
+                if j == step and step == 0:
+                    input_token_emb = tf.nn.embedding_lookup(embeddings_matrix,output_token)
+                elif  j == step:
+                    output_token = pred_tokens[:,j-1]
+                    input_token_emb =  tf.nn.embedding_lookup(embeddings_matrix, output_token)
                 else:
+                    output_token = pred_tokens[:,j-1]
                     input_token_emb = tf.nn.embedding_lookup(embeddings_matrix, output_token)
 
                 if use_attention:
@@ -521,16 +523,16 @@ class TFModel():
         saver = tf.train.Saver(var_list)
         saver.save(self.sess, path)
 
-    def _get_saveable_variables(self, exclude_scopes=[]):
+    def _get_saveable_variables(self, exclude_scopes=[], scope='model'):
         #all_vars = variables._all_saveable_objects()
         #vars_to_train = [var for var in all_vars if all(sc not in var.name for sc in exclude_scopes)]
-        vars_to_train = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='model')
+        vars_to_train = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=scope)
         return vars_to_train
 
-    def _get_trainable_variables(self, exclude_scopes=[]):
+    def _get_trainable_variables(self, exclude_scopes=[],scope="model"):
         #all_vars = tf.global_variables()
         #vars_to_train = [var for var in all_vars if all(sc not in var.name for sc in exclude_scopes)]
-        vars_to_train = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='model')
+        vars_to_train = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=scope)
         return vars_to_train
 
     def get_train_op(self,
@@ -543,22 +545,23 @@ class TFModel():
         """
         """
         if optimizer_scope_name is None:
-            opt_scope = tf.variable_scope('Optimizer')
+            opt_scope = tf.variable_scope('Optimizer', reuse=tf.AUTO_REUSE)
         else:
-            opt_scope = tf.variable_scope(optimizer_scope_name)
+            opt_scope = tf.variable_scope(optimizer_scope_name, reuse=tf.AUTO_REUSE)
 
-        with opt_scope:
+        with opt_scope as vs:
 
             if learnable_scopes is None:
                 #variables_to_train = tf.global_variables()
-                variables_to_train = self._get_trainable_variables()
+                variables_to_train = self._get_trainable_variables(learnable_scopes)
 
             else:
-                variables_to_train = []
-                for scope_name in learnable_scopes:
-                    for var in tf.global_variables():
-                        if scope_name in var.name:
-                            variable_to_train.append(var)
+                #variables_to_train = []
+                #for scope_name in learnable_scopes:
+                #    for var in tf.global_variables():
+                #        if scope_name in var.name:
+                #            variables_to_train.append(var)
+                variables_to_train = self._get_trainable_variables(learnable_scopes)
 
             if optimizer is None:
                 optimizer = tf.train.AdamOptimizer
@@ -571,9 +574,12 @@ class TFModel():
                 grads_and_vars = opt.compute_gradients(loss, var_list=variables_to_train)
 
                 if clip_norm is not None:
-                    print(grads_and_vars)
+                    for grad, var in grads_and_vars:
+                        #print("{} --> {}".format(var, grad))
+                        print(var)
                     grads_and_vars = [(tf.clip_by_norm(grad, clip_norm), var)
                                       for grad, var in grads_and_vars]
+                    print("------------------------------------------")
 
                 train_op = opt.apply_gradients(grads_and_vars)
 
@@ -610,15 +616,22 @@ class Seq2Seq(TFModel):
 
         self.init_graph()
         self.sample_rollout_step = self.rollout_model()
+        var_lst = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,scope='model')
+        print("---------------- roll out params ----------------")
+        for var in var_lst:
+            print(var)
+        print("-------------------------------------------------")
 
         self.train_op = self.get_train_op(self.loss, self.lr_ph,
                                           optimizer=tf.train.AdamOptimizer,
-                                          clip_norm=self.grad_clip)
+                                          clip_norm=self.grad_clip,
+                                          learnable_scopes='model')
 
         self.rl_train_op = self.get_train_op(self.gen_loss_adv, self.lr_ph,
                                              optimizer=tf.train.AdamOptimizer,
                                              clip_norm=self.grad_clip,
-                                             optimizer_scope_name='rl_train_op')
+                                             optimizer_scope_name=None,
+                                             learnable_scopes='model')
 
 
         # initialize graph variables
@@ -669,10 +682,6 @@ class Seq2Seq(TFModel):
     def rollout_model(self):
         '''
         '''
-        #self.init_placeholders()
-        #self.x_mask = tf.cast(self.x_ph, tf.int32)
-        #self.y_mask = tf.cast(self.y_ph, tf.int32)
-        #x_len = tf.reduce_sum(self.x_mask, axis=1)
         with tf.variable_scope("model") as vs:
             vs.reuse_variables()
 
@@ -735,8 +744,8 @@ class Seq2Seq(TFModel):
             #self.teacher_forcing_rate_ph: self.teacher_forcing_rate
         }
 
-        rl_loss,_ = self.sess,run([self.rl_loss, self.rl_train_op], feed_dict=feed_dict)
-        return rl_loss
+        rl_loss, sl_loss, _ = self.sess,run([self.rl_loss,self.loss, self.rl_train_op], feed_dict=feed_dict)
+        return rl_loss,sl_loss
 
 
 
