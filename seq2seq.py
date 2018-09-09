@@ -414,7 +414,6 @@ def attention_rollout_decoder(encoder_outputs, encoder_state, pred_tokens,
                     output_token = pred_tokens[:,j-1]
                     input_token_emb =  tf.nn.embedding_lookup(embeddings_matrix, output_token)
                 else:
-                    output_token = pred_tokens[:,j-1]
                     input_token_emb = tf.nn.embedding_lookup(embeddings_matrix, output_token)
 
                 if use_attention:
