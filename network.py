@@ -251,21 +251,6 @@ class GoalOrientedBotNetwork(TFModel):
                         self._emb_context,
                         hidden_size=self.attn.hidden_size,
                         projected_align = self.attn.projected_align)
-                elif self.attn.type == 'cs_general':
-                    _attn_output = am.cs_general_attention(
-                        self._key,
-                        self._emb_context,
-                        hidden_size = self.attn.hidden_size,
-                        depth = self.attn.depth,
-                        projected_align=self.attn.projected_align)
-                elif self.attn.type=='cs_bahdanau':
-                    _attn_output = am.cs_bahdanau_attention(
-                        self._key,
-                        self._emb_context,
-                        hidden_size = self.attn.hidden_size,
-                        depth=self.attn.depth,
-                        projected_align=self.attn.projected_align
-                    )
                 elif self.attn.type=='light_general':
                     _attn_output = am.light_general_attention(
                         self._key,

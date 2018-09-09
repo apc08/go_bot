@@ -77,6 +77,31 @@ class SimpleVocabulary():
         #if self.load_path:
         #    self.load()
 
+    def load_pretrained_embeddings(self, embedding_path):
+        """
+        加载预训练的embedding
+        """
+        trained_embeddings = {}
+
+        with open(embedding_path, 'r') as fin:
+            for line in fin：
+            contents = line.strip().split()
+            token = contents[0].decode('utf8')
+            if token not in self:
+                continue
+            trained_embeddings[token] = list(map(float, contents[1:]))
+            if self.embed_dim is None:
+                self.embed_dim = len(contents) - 1
+        filtered_tokens = trained_embeddings.keys()
+
+        self.embeddings = np.zeros([len(self),self.embed_dim])
+
+        for token in trainded_embeddings:
+            token_id = self(token)
+            self.embeddings[token_id] = trained_embeddings[token]
+
+        return self.embeddings
+
 
     def fit(self, tokens):
         self.reset()

@@ -261,3 +261,9 @@ class GloveEmbedder():
         return embedded_tokens
 
 
+class BasicEmbedder():
+    """
+    基本的word vec embedder
+    """
+
+

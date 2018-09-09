@@ -39,7 +39,6 @@ class GoalOrientedBot(NNModel):
         template_path = Path(template_path)
         template_type = gatattr(templ, template_type)
         self.templates = templ.Templates(template_type).load(template_path)
-        self.templates = templ.Templates(template_type).load(template_path)
         self.n_actions = len(self.templates)
 
         self.database = database

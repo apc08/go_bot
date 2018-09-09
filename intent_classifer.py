@@ -327,6 +327,9 @@ class IntentClassifier(TFModel):
         #y_pred = self.sess.run(self.y_pred_tokens, feed_dict=feed_dict)
         y_pred = self.sess.run(self.logits, feed_dict=feed_dict)
 
+        #labels = proba2labels(y_pred, confident_threshold=self.confident_threshod,classes=self.classes)
+        #return labels, [dict(zip(self.classes,y_pred[i])) for i in range(y_pred.shape[0])]
+
         return y_pred
 
 from data_iterator import *

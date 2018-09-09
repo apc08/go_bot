@@ -3,6 +3,42 @@
 import tensorflow as tf
 from tensorflow.contrib.layers import xavier_initializer as xav
 
+
+def bilinear_attetion(question_rep, passage_repres,  passage_mask):
+    """
+    常规的attention 机制
+
+    args:
+        question_rep : [batch_size, hidden_size]
+        passage_repres : [batch_size, sequence_length, hidden_size]
+        passage_mask : [batch, sequence_length]
+
+    returns:
+        passage_rep : [batch_size, hidden_size]
+    """
+    hidden_size = question_rep.get_shape()[1]
+    # [hidden_size, hidden_size]
+    W_bilinear = tf.get_variable("W_bilinear", shape=[hidden_size, hidden_size], dtype=tf.float32)
+
+    # [batch_size, hidden_size]
+    question_rep = tf.matmul(question_rep, W_bilinear)
+
+    # [batch_size, 1, hidden_size]
+    question_rep = tf.expand_dims(question_rep, 1)
+
+    # [batch_size, seq_length]
+    alpha = tf.nn.softmax(tf.reduce_sum(question_rep * passage_repres, axis=2))
+    alpha = alpha * passage_mask
+    alpha = alpha / tf.reduce_sum(alpha, axis=-1, keep_dims=True)
+
+    # [batch_size, hidden_size]
+    passage_rep = tf.reduce_sum(passage_repres * tf.expand_dims(alpha, axis=-1), axis=1)
+
+    return passage_rep
+
+
+
+
 def general_attention(key, context, hidden_size, projected_align=False):
     """
     key: [None, None, Key_size]   # batch, turn_num, key_dim
